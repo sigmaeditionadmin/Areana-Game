@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Circle Arena Game</title>
+    <style>
+        body {
+            margin: 0;
+            overflow: hidden;
+            background: #111;
+            color: white;
+            font-family: Arial;
+        }
+        #ui {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+        }
+        canvas {
+            display: block;
+        }
+    </style>
+</head>
+<body>
+
+<div id="ui">
+    <div>HP: <span id="hp">100</span></div>
+    <div>Enemy HP: <span id="enemyHp">50</span></div>
+</div>
+
+<canvas id="game"></canvas>
+
+<script>
+const canvas = document.getElementById("game");
+const ctx = canvas.getContext("2d");
+
+canvas.width = window.innerWidth;
+canvas.height = window.innerHeight;
+
+const centerX = canvas.width / 2;
+const centerY = canvas.height / 2;
+const arenaRadius = 300;
+
+// Player
+let player = {
+    x: centerX,
+    y: centerY,
+    radius: 15,
+    speed: 4,
+    hp: 100,
+    dy: 0,
+    onGround: true,
+    blocking: false
+};
+
+// Enemy
+let enemy = {
+    x: centerX + 100,
+    y: centerY,
+    radius: 15,
+    speed: 2,
+    hp: 50
+};
+
+// Controls
+let keys = {};
+document.addEventListener("keydown", e => keys[e.key.toLowerCase()] = true);
+document.addEventListener("keyup", e => keys[e.key.toLowerCase()] = false);
+
+document.addEventListener("contextmenu", e => e.preventDefault());
+
+canvas.addEventListener("mousedown", e => {
+    if (e.button === 0) attack();
+    if (e.button === 2) player.blocking = true;
+});
+
+canvas.addEventListener("mouseup", e => {
+    if (e.button === 2) player.blocking = false;
+});
+
+// Jump
+function jump() {
+    if (player.onGround) {
+        player.dy = -10;
+        player.onGround = false;
+    }
+}
+
+// Attack
+function attack() {
+    let dx = player.x - enemy.x;
+    let dy = player.y - enemy.y;
+    let dist = Math.sqrt(dx*dx + dy*dy);
+
+    if (dist < 40) {
+        enemy.hp -= 10;
+        document.getElementById("enemyHp").textContent = enemy.hp;
+    }
+}
+
+// Game loop
+function update() {
+    // Movement
+    if (keys["w"]) player.y -= player.speed;
+    if (keys["s"]) player.y += player.speed;
+    if (keys["a"]) player.x -= player.speed;
+    if (keys["d"]) player.x += player.speed;
+    if (keys[" "]) jump();
+
+    // Gravity
+    player.y += player.dy;
+    player.dy += 0.5;
+    if (player.y > centerY) {
+        player.y = centerY;
+        player.dy = 0;
+        player.onGround = true;
+    }
+
+    // Keep player in circle
+    let dx = player.x - centerX;
+    let dy = player.y - centerY;
+    let dist = Math.sqrt(dx*dx + dy*dy);
+    if (dist > arenaRadius - player.radius) {
+        player.x = centerX + dx / dist * (arenaRadius - player.radius);
+        player.y = centerY + dy / dist * (arenaRadius - player.radius);
+    }
+
+    // Enemy follows player
+    let edx = player.x - enemy.x;
+    let edy = player.y - enemy.y;
+    let edist = Math.sqrt(edx*edx + edy*edy);
+    enemy.x += edx / edist * enemy.speed;
+    enemy.y += edy / edist * enemy.speed;
+
+    // Enemy attack
+    if (edist < 30) {
+        if (player.blocking) {
+            player.hp -= 0.1;
+        } else {
+            player.hp -= 0.3;
+        }
+        document.getElementById("hp").textContent = Math.floor(player.hp);
+    }
+}
+
+// Draw
+function draw() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    // Arena
+    ctx.beginPath();
+    ctx.arc(centerX, centerY, arenaRadius, 0, Math.PI * 2);
+    ctx.strokeStyle = "white";
+    ctx.stroke();
+
+    // Player
+    ctx.beginPath();
+    ctx.arc(player.x, player.y, player.radius, 0, Math.PI * 2);
+    ctx.fillStyle = player.blocking ? "blue" : "green";
+    ctx.fill();
+
+    // Enemy
+    ctx.beginPath();
+    ctx.arc(enemy.x, enemy.y, enemy.radius, 0, Math.PI * 2);
+    ctx.fillStyle = "red";
+    ctx.fill();
+}
+
+function gameLoop() {
+    update();
+    draw();
+    requestAnimationFrame(gameLoop);
+}
+
+gameLoop();
+</script>
+
+</body>
+</html>
