@@ -1,30 +1,18 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Circle Arena Game</title>
+    <title>First Person Arena</title>
     <style>
-        body {
-            margin: 0;
-            overflow: hidden;
-            background: #111;
-            color: white;
-            font-family: Arial;
-        }
-        #ui {
-            position: absolute;
-            top: 10px;
-            left: 10px;
-        }
-        canvas {
-            display: block;
-        }
+        body { margin: 0; overflow: hidden; background: black; color: white; font-family: Arial; }
+        #ui { position: absolute; top: 10px; left: 10px; }
+        canvas { display: block; }
     </style>
 </head>
 <body>
 
 <div id="ui">
-    <div>HP: <span id="hp">100</span></div>
-    <div>Enemy HP: <span id="enemyHp">50</span></div>
+    HP: <span id="hp">100</span> |
+    Enemy HP: <span id="enemyHp">50</span>
 </div>
 
 <canvas id="game"></canvas>
@@ -32,142 +20,158 @@
 <script>
 const canvas = document.getElementById("game");
 const ctx = canvas.getContext("2d");
-
 canvas.width = window.innerWidth;
 canvas.height = window.innerHeight;
 
-const centerX = canvas.width / 2;
-const centerY = canvas.height / 2;
-const arenaRadius = 300;
+let keys = {};
+document.addEventListener("keydown", e => keys[e.key.toLowerCase()] = true);
+document.addEventListener("keyup", e => keys[e.key.toLowerCase()] = false);
+document.addEventListener("contextmenu", e => e.preventDefault());
 
 // Player
 let player = {
-    x: centerX,
-    y: centerY,
-    radius: 15,
-    speed: 4,
+    x: 3,
+    y: 3,
+    angle: 0,
     hp: 100,
-    dy: 0,
-    onGround: true,
     blocking: false
 };
 
 // Enemy
 let enemy = {
-    x: centerX + 100,
-    y: centerY,
-    radius: 15,
-    speed: 2,
+    x: 7,
+    y: 7,
     hp: 50
 };
 
-// Controls
-let keys = {};
-document.addEventListener("keydown", e => keys[e.key.toLowerCase()] = true);
-document.addEventListener("keyup", e => keys[e.key.toLowerCase()] = false);
+// Map (1 = wall, 0 = floor)
+let map = [
+    [1,1,1,1,1,1,1,1,1,1],
+    [1,0,0,0,0,0,0,0,0,1],
+    [1,0,0,0,0,0,0,0,0,1],
+    [1,0,0,0,0,0,0,0,0,1],
+    [1,0,0,0,0,0,0,0,0,1],
+    [1,0,0,0,0,0,0,0,0,1],
+    [1,0,0,0,0,0,0,0,0,1],
+    [1,0,0,0,0,0,0,0,0,1],
+    [1,0,0,0,0,0,0,0,0,1],
+    [1,1,1,1,1,1,1,1,1,1],
+];
 
-document.addEventListener("contextmenu", e => e.preventDefault());
-
+// Mouse attack/block
 canvas.addEventListener("mousedown", e => {
     if (e.button === 0) attack();
     if (e.button === 2) player.blocking = true;
 });
-
 canvas.addEventListener("mouseup", e => {
     if (e.button === 2) player.blocking = false;
 });
 
-// Jump
-function jump() {
-    if (player.onGround) {
-        player.dy = -10;
-        player.onGround = false;
-    }
-}
+// Mouse look
+document.addEventListener("mousemove", e => {
+    player.angle += e.movementX * 0.002;
+});
 
 // Attack
 function attack() {
-    let dx = player.x - enemy.x;
-    let dy = player.y - enemy.y;
+    let dx = enemy.x - player.x;
+    let dy = enemy.y - player.y;
     let dist = Math.sqrt(dx*dx + dy*dy);
-
-    if (dist < 40) {
+    if (dist < 1.5) {
         enemy.hp -= 10;
         document.getElementById("enemyHp").textContent = enemy.hp;
     }
 }
 
-// Game loop
-function update() {
-    // Movement
-    if (keys["w"]) player.y -= player.speed;
-    if (keys["s"]) player.y += player.speed;
-    if (keys["a"]) player.x -= player.speed;
-    if (keys["d"]) player.x += player.speed;
-    if (keys[" "]) jump();
+// Movement
+function move() {
+    let speed = 0.05;
+    let nx = player.x;
+    let ny = player.y;
 
-    // Gravity
-    player.y += player.dy;
-    player.dy += 0.5;
-    if (player.y > centerY) {
-        player.y = centerY;
-        player.dy = 0;
-        player.onGround = true;
+    if (keys["w"]) {
+        nx += Math.cos(player.angle) * speed;
+        ny += Math.sin(player.angle) * speed;
+    }
+    if (keys["s"]) {
+        nx -= Math.cos(player.angle) * speed;
+        ny -= Math.sin(player.angle) * speed;
+    }
+    if (keys["a"]) {
+        nx += Math.cos(player.angle - Math.PI/2) * speed;
+        ny += Math.sin(player.angle - Math.PI/2) * speed;
+    }
+    if (keys["d"]) {
+        nx += Math.cos(player.angle + Math.PI/2) * speed;
+        ny += Math.sin(player.angle + Math.PI/2) * speed;
     }
 
-    // Keep player in circle
-    let dx = player.x - centerX;
-    let dy = player.y - centerY;
+    if (map[Math.floor(ny)][Math.floor(nx)] === 0) {
+        player.x = nx;
+        player.y = ny;
+    }
+}
+
+// Enemy AI
+function enemyAI() {
+    let dx = player.x - enemy.x;
+    let dy = player.y - enemy.y;
     let dist = Math.sqrt(dx*dx + dy*dy);
-    if (dist > arenaRadius - player.radius) {
-        player.x = centerX + dx / dist * (arenaRadius - player.radius);
-        player.y = centerY + dy / dist * (arenaRadius - player.radius);
-    }
 
-    // Enemy follows player
-    let edx = player.x - enemy.x;
-    let edy = player.y - enemy.y;
-    let edist = Math.sqrt(edx*edx + edy*edy);
-    enemy.x += edx / edist * enemy.speed;
-    enemy.y += edy / edist * enemy.speed;
+    enemy.x += dx * 0.01;
+    enemy.y += dy * 0.01;
 
-    // Enemy attack
-    if (edist < 30) {
-        if (player.blocking) {
-            player.hp -= 0.1;
-        } else {
-            player.hp -= 0.3;
-        }
+    if (dist < 1) {
+        if (player.blocking) player.hp -= 0.05;
+        else player.hp -= 0.15;
+
         document.getElementById("hp").textContent = Math.floor(player.hp);
     }
 }
 
-// Draw
-function draw() {
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
+// Raycasting render
+function draw3D() {
+    ctx.fillStyle = "black";
+    ctx.fillRect(0,0,canvas.width,canvas.height);
 
-    // Arena
-    ctx.beginPath();
-    ctx.arc(centerX, centerY, arenaRadius, 0, Math.PI * 2);
-    ctx.strokeStyle = "white";
-    ctx.stroke();
+    for (let x = 0; x < canvas.width; x++) {
+        let rayAngle = player.angle - 0.5 + (x / canvas.width);
+        let distance = 0;
+        let hit = false;
 
-    // Player
-    ctx.beginPath();
-    ctx.arc(player.x, player.y, player.radius, 0, Math.PI * 2);
-    ctx.fillStyle = player.blocking ? "blue" : "green";
-    ctx.fill();
+        while (!hit && distance < 20) {
+            distance += 0.05;
+            let rx = player.x + Math.cos(rayAngle) * distance;
+            let ry = player.y + Math.sin(rayAngle) * distance;
 
-    // Enemy
-    ctx.beginPath();
-    ctx.arc(enemy.x, enemy.y, enemy.radius, 0, Math.PI * 2);
+            if (map[Math.floor(ry)][Math.floor(rx)] === 1) {
+                hit = true;
+            }
+        }
+
+        let wallHeight = 500 / distance;
+        ctx.fillStyle = "white";
+        ctx.fillRect(x, canvas.height/2 - wallHeight/2, 1, wallHeight);
+    }
+
+    // Draw enemy
+    let dx = enemy.x - player.x;
+    let dy = enemy.y - player.y;
+    let dist = Math.sqrt(dx*dx + dy*dy);
+    let angle = Math.atan2(dy, dx) - player.angle;
+
+    let size = 500 / dist;
+    let x = (canvas.width / 2) + Math.tan(angle) * 500;
+
     ctx.fillStyle = "red";
-    ctx.fill();
+    ctx.fillRect(x - size/2, canvas.height/2 - size/2, size, size);
 }
 
+// Game loop
 function gameLoop() {
-    update();
-    draw();
+    move();
+    enemyAI();
+    draw3D();
     requestAnimationFrame(gameLoop);
 }
 
